@@ -41,6 +41,9 @@ func serve(w dns.ResponseWriter, req *dns.Msg, z *Zone) {
 
 	realIp, _, _ := net.SplitHostPort(w.RemoteAddr().String())
 
+	realIpIp := net.ParseIP(realIp)
+	permitDebug := !*flagPrivateDebug || (realIpIp != nil && realIpIp.IsLoopback())
+
 	z.Metrics.ClientStats.Add(realIp)
 
 	var ip net.IP // EDNS or real IP
@@ -101,7 +104,7 @@ func serve(w dns.ResponseWriter, req *dns.Msg, z *Zone) {
 
 		firstLabel := (strings.Split(label, "."))[0]
 
-		if firstLabel == "_status" {
+		if permitDebug && firstLabel == "_status" {
 			if qtype == dns.TypeANY || qtype == dns.TypeTXT {
 				m.Answer = statusRR(label + "." + z.Origin + ".")
 			} else {
@@ -112,7 +115,7 @@ func serve(w dns.ResponseWriter, req *dns.Msg, z *Zone) {
 			return
 		}
 
-		if firstLabel == "_health" {
+		if permitDebug && firstLabel == "_health" {
 			if qtype == dns.TypeANY || qtype == dns.TypeTXT {
 				baseLabel := strings.Join((strings.Split(label, "."))[1:], ".")
 				m.Answer = z.healthRR(label+"."+z.Origin+".", baseLabel)
@@ -126,7 +129,7 @@ func serve(w dns.ResponseWriter, req *dns.Msg, z *Zone) {
 			return
 		}
 
-		if firstLabel == "_country" {
+		if permitDebug && firstLabel == "_country" {
 			if qtype == dns.TypeANY || qtype == dns.TypeTXT {
 				h := dns.RR_Header{Ttl: 1, Class: dns.ClassINET, Rrtype: dns.TypeTXT}
 				h.Name = label + "." + z.Origin + "."
